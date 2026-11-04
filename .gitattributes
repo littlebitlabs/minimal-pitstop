@@ -1,0 +1,2 @@
+docker-compose.yml -text
+docs/* -text

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to connect Minimal Studio</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>How to connect Minimal Studio</h1>
+<p>Goal: the Minimal Studio desktop app working against your install, and the two opt-in security switches that go with it understood.</p>
+<h2>Connect with one address</h2>
+<p>Studio needs only the gateway address typed:</p>
+<ul>
+<li>Local: <code>http://api.localhost</code> (with the port, if you <a href="howto-ports-and-a-second-install.html">changed it</a>)</li>
+<li>LAN or Hosted: <code>https://api.&lt;your-name&gt;</code></li>
+</ul>
+<p>Nothing is created in the identity console: the desktop client id is published by the install itself at <code>&lt;api&gt;/app/config/config.json</code>, key <code>studio_desktop_client_id</code>, and the installer&#39;s Ready screen shows the address and the id side by side with copy chips.</p>
+<pre><code class="language-bash">curl -sS http://api.localhost/app/config/config.json | grep studio
+</code></pre>
+<pre><code class="language-text">  &quot;studio_desktop_client_id&quot;: &quot;397826718259281923&quot;,
+</code></pre>
+<p>Sign in as a user of this install; your roles decide what Studio shows you.</p>
+<h2>Changing shape needs the <code>schema</code> role</h2>
+<p>Reading database shape works for any admin. <strong>Changing</strong> it — the DDL screens — needs the role <code>schema</code>, which only the first human admin holds after an install. Grant it to someone else only on purpose, in the console (<strong>Projects → pitstop-platform → Role Assignments</strong>): the DDL door executes the SQL it is given, so the role is the boundary.</p>
+<h2>Core access tokens</h2>
+<p>Studio and your own tools take Core access tokens at the token door:</p>
+<pre><code class="language-text">&lt;api&gt;/minimal-token/…    header: LB-Access-Token
+</code></pre>
+<p>Give each token the least roles and a read-only key type where reading is the job, and revoke it when its work is done: whoever holds the token can use it from anywhere the gateway is reachable.</p>
+<h2>The two opt-in switches (fixed at the first start)</h2>
+<p>Both default off, both on the installer&#39;s last step, both frozen once the stack has started:</p>
+<ol>
+<li><p><strong>Require an authenticator app at the first sign-in</strong> — or, by hand, in <code>pitstop.yaml</code> before the first start:</p>
+<pre><code class="language-yaml">security:
+  require_mfa: true
+</code></pre>
+<p>The first admin is then asked to set up an authenticator at the first sign-in. <strong>Save the setup key shown beside the QR code</strong> — the identity service has no backup codes. Recommended on a Hosted install.</p>
+</li>
+<li><p><strong>Let Minimal Studio create and drop databases</strong> — <code>database_ddl: true</code> under the same <code>security:</code> key. It extends the <code>schema</code> role (nobody else) to whole databases. A create needs a privileged database connection you type into Studio; a drop needs two confirmations minted at least 23 minutes apart plus that connection, and never drops the project&#39;s only registered database.</p>
+</li>
+</ol>
+<p>Editing these in <code>pitstop.yaml</code> later changes nothing on an installed stack — they are read once, at the first start.</p>
+<h2>Verify</h2>
+<ul>
+<li><code>config.json</code> answers with a <code>studio_desktop_client_id</code>.</li>
+<li>Studio signs you in through the install&#39;s own login page.</li>
+<li>A user without <code>schema</code> can read shape but not change it.</li>
+</ul>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

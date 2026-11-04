@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial: put Minimal on the internet</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>Tutorial: put Minimal on the internet</h1>
+<p>You will install Minimal on a public server under your own domain, with real certificates from Let&#39;s Encrypt, and check from the outside that it is reachable and secure. Allow about thirty minutes, plus the time your DNS provider needs to publish two records.</p>
+<p>This tutorial costs money: a server, a domain, and DNS records you create. The cheapest way to follow it is one small cloud server (2 vCPU and 4 GiB is enough) that you delete afterwards.</p>
+<p>In the text the name is <code>pitstop.example.com</code> and the server&#39;s address is written <code>xx.yy.zz.aa</code>. The screenshots were taken on the author&#39;s own domain, with addresses masked; use your own name and address.</p>
+<h2>What you need</h2>
+<ul>
+<li><p>A server with Docker Engine 26 or later and the Compose plugin, a public address, and <strong>both</strong> ports 80 and 443 open to the internet. Port 80 is used to obtain the certificate; port 443 serves the stack.</p>
+</li>
+<li><p>A domain name you control. Two A records must point at the server before you start:</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>api.pitstop.example.com</code></td>
+<td>A</td>
+<td><code>xx.yy.zz.aa</code></td>
+</tr>
+<tr>
+<td><code>auth.pitstop.example.com</code></td>
+<td>A</td>
+<td><code>xx.yy.zz.aa</code></td>
+</tr>
+</tbody></table>
+</li>
+<li><p>A real email address. It becomes the admin&#39;s address and the contact Let&#39;s Encrypt keeps.</p>
+</li>
+<li><p>Your key file, secret and slug, and the server&#39;s public address added under <strong>Relay access</strong> in the licence portal (<a href="https://license.littlebitlabs.com">https://license.littlebitlabs.com</a> — self-service, sign in with Google or GitHub), in the organisation that owns the key file.</p>
+</li>
+<li><p>Nothing in front of the server: no load balancer, CDN or proxy. IPv6-only hosts and renaming after the first start are not supported.</p>
+</li>
+</ul>
+<p>Check the records from your own machine:</p>
+<pre><code class="language-bash">dig +short api.pitstop.example.com auth.pitstop.example.com
+</code></pre>
+<pre><code class="language-text">xx.yy.zz.aa
+xx.yy.zz.aa
+</code></pre>
+<h2>1. Start the installer on the server</h2>
+<p>On the server, make a folder, fetch the compose file and start the installer, as in <a href="install-local.html">the local tutorial</a>. Then tunnel from your laptop and open the one-time address:</p>
+<pre><code class="language-bash">ssh -L 8070:localhost:8070 you@xx.yy.zz.aa
+</code></pre>
+<p>The first page is <strong>Hello.</strong>; press <strong>Continue</strong>.</p>
+<p><img src="../guides/images/install-hosted-00-welcome.png" alt="The first page of the installer"></p>
+<p><em>The installer&#39;s first page.</em></p>
+<h2>2. Choose Hosted</h2>
+<ol>
+<li><p>On <strong>Where will this run?</strong> choose <strong>Hosted</strong>. Type your <strong>Domain name</strong> (<code>pitstop.example.com</code>) and the <strong>Admin email (also the certificate contact — a real address)</strong>.</p>
+<p>The page looks up both names and shows where each points. When they point at this machine it says <strong>These names point at this machine.</strong></p>
+<p><img src="../guides/images/install-hosted-01-where.png" alt="Hosted selected; both names point at this machine"></p>
+<p><em>The Hosted choice with the DNS check. The addresses are masked.</em></p>
+</li>
+<li><p>Choose a dataset on <strong>Start with.</strong> and press <strong>Continue</strong> (the screen is the same in every mode; the local tutorial describes the ten datasets).</p>
+<p><img src="../guides/images/install-hosted-01a-dataset.png" alt="The dataset screen"></p>
+<p><em>The dataset list with its description panel.</em></p>
+<p>On <strong>Your licence.</strong> choose the key file and enter the secret and the slug.</p>
+<p><img src="../guides/images/install-hosted-02-licence.png" alt="The licence screen"></p>
+<p><em>The licence screen; the server&#39;s public address is masked.</em></p>
+</li>
+<li><p>On the review screen tick <strong>Relay access</strong> and the agreement, then press <strong>Prepare my Minimal</strong>.</p>
+<p><img src="../guides/images/install-hosted-03-review.png" alt="The review screen"></p>
+<p><em>Both boxes ticked.</em></p>
+</li>
+<li><p>Wait. The stages are the same eight as in the local tutorial.</p>
+<p><img src="../guides/images/install-hosted-04-progress.png" alt="Stage four of eight"></p>
+<p><em>The installer working through the stages.</em></p>
+</li>
+<li><p>The Ready screen lists your public addresses, all under <code>https://</code>.</p>
+<p><img src="../guides/images/install-hosted-05-ready.png" alt="The Ready screen in Hosted mode"></p>
+<p><em>The Ready screen on a Hosted install. The admin account is <code>admin@pitstop.auth.pitstop.example.com</code>.</em></p>
+</li>
+</ol>
+<h2>3. Check it from the outside</h2>
+<p>On the server:</p>
+<pre><code class="language-bash">docker compose ps
+</code></pre>
+<p><img src="../guides/images/install-hosted-06-containers.png" alt="docker compose ps"></p>
+<p><em>The stack running.</em></p>
+<p>From any other machine, check the certificate and the redirect from port 80:</p>
+<pre><code class="language-bash">openssl s_client -connect api.pitstop.example.com:443 -servername api.pitstop.example.com &lt;/dev/null 2&gt;/dev/null | openssl x509 -noout -subject -issuer -dates
+</code></pre>
+<pre><code class="language-bash">curl -sSI http://api.pitstop.example.com/ | head -3
+</code></pre>
+<pre><code class="language-bash">curl -sS -o /dev/null -w &#39;%{http_code} verify=%{ssl_verify_result}\n&#39; https://auth.pitstop.example.com/
+</code></pre>
+<p><img src="../guides/images/install-hosted-07-certificate.png" alt="Certificate checks"></p>
+<p><em>The issuer is Let&#39;s Encrypt, port 80 answers <code>308 Permanent Redirect</code> to https, and curl verifies the certificate (<code>verify=0</code>).</em></p>
+<h2>4. Sign in</h2>
+<p>Sign in as in the local tutorial, at <code>https://auth.pitstop.example.com/ui/console</code>, with <code>admin@pitstop.auth.pitstop.example.com</code> and the initial password from <strong>Reveal the initial password</strong> or <code>docker compose run --rm -T admin-password</code>. Then open <code>https://api.pitstop.example.com/app/</code>.</p>
+<p><img src="../guides/images/install-hosted-08-app.png" alt="The sample app on the public domain"></p>
+<p><em>The sample app signed in over the public domain.</em></p>
+<h2>Check yourself</h2>
+<ul>
+<li><code>dig</code> returns the server&#39;s address for both names.</li>
+<li>The certificate&#39;s issuer is Let&#39;s Encrypt and <code>curl</code> prints <code>verify=0</code>.</li>
+<li><code>http://api.pitstop.example.com/</code> answers <code>308</code> to the same address over https.</li>
+<li>You can sign in at the console and open the app.</li>
+</ul>
+<p>If the install stops at the licence stage, the licence server refused the call. That has several causes; the usual one is that the server&#39;s address is listed in a different organisation than the key file&#39;s. Check <strong>Relay access</strong> in the organisation that owns the key file.</p>
+<h2>Clean up</h2>
+<p>To remove the stack and its data, run <code>docker compose down -v</code> in the folder. Then delete the server, the two DNS records, and the server&#39;s entry under <strong>Relay access</strong>.</p>
+<h2>Next</h2>
+<p><a href="mcp-developer-guide.html">Minimal over MCP</a> runs the same on a Hosted install; the only difference is the address.</p>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

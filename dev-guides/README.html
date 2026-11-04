@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minimal Pitstop — tutorials, how-to guides and reference</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<h1>Minimal Pitstop — tutorials, how-to guides and reference</h1>
+<p>Minimal turns your database tables into a governed REST API with built-in identity, roles, a sample app and an MCP door for AI assistants. Pitstop runs the whole stack on one machine with Docker, from one compose file. These guides document release 0.3.6.</p>
+<p>The guides come in three kinds. Pick by what you are doing:</p>
+<ul>
+<li><strong>Tutorials</strong> teach by doing: one worked path, numbered steps, a result you can check.</li>
+<li><strong>How-to guides</strong> solve one task each: the goal is in the title, the preconditions come first.</li>
+<li><strong>Reference</strong> explains the machine: what runs, who may do what, and the contracts your code calls.</li>
+</ul>
+<h2>Start here</h2>
+<p><strong>You want a running Minimal.</strong> Do <a href="install-local.html">Install Minimal on your own computer</a>. Then put it where it belongs: <a href="install-lan.html">on your network</a> or <a href="install-hosted.html">on the internet</a>.</p>
+<p><strong>You build against a running Minimal.</strong> Read <a href="reference-stack.html">The stack</a> once, then <a href="reference-roles-and-access.html">Identity, roles and who sees what</a> and <a href="reference-rest-api.html">The REST API</a>. For AI assistants, <a href="mcp-developer-guide.html">Minimal over MCP</a> is the complete walk; <a href="mcp-chat-guide.html">work with Minimal from a Claude Code chat</a> shows the same power without writing a call by hand.</p>
+<p><strong>You&#39;d rather not read at all.</strong> Hand the work to your AI agent with the skill below.</p>
+<h2>Skip the reading: give your agent the skill</h2>
+<p>The whole install-and-verify procedure also ships as an <strong>agent skill</strong> — one self-contained file your coding agent follows, asking you only for the licence inputs. You read nothing; the agent prepares, installs, verifies and reports.</p>
+<ul>
+<li>The skill, in the format of every common agent — Claude Code, Cursor, GitHub Copilot, Windsurf, Cline, RooCode, Aider, OpenCode, Codex, JetBrains Junie, Kiro and more — is published beside each release: <a href="https://artifacts.littlebitlabs.com/api/packages/littlebitlabs/generic/agent-skills/0.3.6/README.md">the map of formats</a>, <a href="https://artifacts.littlebitlabs.com/api/packages/littlebitlabs/generic/agent-skills/0.3.6/agent-skills-v0.3.6.tar.gz">the tarball</a>, and each file on its own beside them.</li>
+<li>For Claude Code: save <a href="https://artifacts.littlebitlabs.com/api/packages/littlebitlabs/generic/agent-skills/0.3.6/claude-code-SKILL.md">this file</a> as <code>.claude/skills/pitstop-setup/SKILL.md</code> in the folder where the install will run, then ask for Minimal to be installed.</li>
+<li>The canonical copy is <a href="https://artifacts.littlebitlabs.com/api/packages/littlebitlabs/generic/docs/0.3.6/pitstop-setup-SKILL.md">pitstop-setup-SKILL.md</a>; any agent can follow it as plain instructions even without a skills mechanism.</li>
+</ul>
+<p>The skill installs by the file route (no browser), so it also fits servers you only reach over SSH. The tutorials remain the way to understand what the agent just did.</p>
+<h2>All guides</h2>
+<h3>Tutorials</h3>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>What you end with</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="install-local.html">Install Minimal on your own computer</a></td>
+<td>the stack on one machine, signed in to the sample CRM</td>
+</tr>
+<tr>
+<td><a href="install-hosted.html">Put Minimal on the internet</a></td>
+<td>a public install under your domain with real certificates</td>
+</tr>
+<tr>
+<td><a href="mcp-chat-guide.html">Work with Minimal from a Claude Code chat</a></td>
+<td>an AI assistant reading and changing rows on your install</td>
+</tr>
+</tbody></table>
+<h3>How-to guides</h3>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>The task</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="install-lan.html">Run Minimal on a LAN host</a></td>
+<td>serve your network over HTTPS with a self-signed root you trust once per device</td>
+</tr>
+<tr>
+<td><a href="howto-operate.html">Operate an installed stack</a></td>
+<td>health, backup and restore, a new licence, a clean retry, uninstall</td>
+</tr>
+<tr>
+<td><a href="howto-ports-and-a-second-install.html">Change the ports, or run a second install</a></td>
+<td>free ports 80/443, or two stacks on one Docker engine</td>
+</tr>
+<tr>
+<td><a href="howto-social-signin.html">Add Google or GitHub sign-in</a></td>
+<td>social sign-in on a LAN or Hosted install</td>
+</tr>
+<tr>
+<td><a href="howto-minimal-studio.html">Connect Minimal Studio</a></td>
+<td>the desktop client, the <code>schema</code> role, and the two opt-in security switches</td>
+</tr>
+</tbody></table>
+<h3>Reference</h3>
+<table>
+<thead>
+<tr>
+<th>Guide</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="reference-stack.html">The stack</a></td>
+<td>every container and helper, the addresses, what is fixed at the first start</td>
+</tr>
+<tr>
+<td><a href="reference-roles-and-access.html">Identity, roles and who sees what</a></td>
+<td>the four roles, the demo users, access classes, granting roles</td>
+</tr>
+<tr>
+<td><a href="reference-rest-api.html">The REST API</a></td>
+<td>the address shape, tokens, the query grammar, reads and writes per role</td>
+</tr>
+<tr>
+<td><a href="mcp-developer-guide.html">Minimal over MCP</a></td>
+<td>the MCP door end to end: Custom APIs, row tools, apps, tokens, audit</td>
+</tr>
+<tr>
+<td><a href="reference-troubleshooting.html">When something fails</a></td>
+<td>how to read a failed start, and the refusals that are easy to misread</td>
+</tr>
+</tbody></table>
+<p>Every guide stands alone; the install tutorials are the only prerequisite anywhere. HTML versions of all of these sit beside the Markdown files.</p>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

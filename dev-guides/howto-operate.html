@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to operate an installed stack</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>How to operate an installed stack</h1>
+<p>Goal: keep a running install healthy, back it up, change its licence, recover from a failed start, and remove it cleanly. Every command runs in the install folder.</p>
+<h2>Is it healthy?</h2>
+<pre><code class="language-bash">docker compose ps
+</code></pre>
+<p>One-shot services show <code>Exited (0)</code>; the rest show <code>Up</code>, and <code>caddy</code>, <code>minimal</code>, <code>resolver</code> and <code>relay</code> show <code>(healthy)</code> (<code>app</code> and <code>zitadel</code> have no health check by design). The real check is the tour:</p>
+<pre><code class="language-bash">docker compose run --rm tour
+</code></pre>
+<p>It signs in as the demo editor and reads a staff table (HTTP 200), repeats the call as the viewer (HTTP 403), and probes the MCP door (401 without a token). <code>Done.</code> and exit 0 is the verdict.</p>
+<h2>Read the admin password again</h2>
+<p>The initial password is printed once by the installer&#39;s <strong>Reveal the initial password</strong>; after that:</p>
+<pre><code class="language-bash">docker compose run --rm admin-password
+</code></pre>
+<p>It dies at the first sign-in, which forces a change. If an AI agent runs your commands, do not let it print the password — have it write a file only you can read, and delete the file after you changed the password:</p>
+<pre><code class="language-bash">(umask 077; docker compose run --rm -T admin-password &gt; admin-password.txt)
+</code></pre>
+<h2>Back up</h2>
+<pre><code class="language-bash">umask 077 &amp;&amp; docker compose run --rm -T backup &gt; pitstop-backup.tar
+</code></pre>
+<p>The archive opens with a <code>MANIFEST</code> and <code>SHA256SUMS</code>, then the three database dumps and the stack&#39;s state. It holds <strong>every secret</strong> — encrypt it before it leaves the machine. Two keys nothing can recreate:</p>
+<pre><code class="language-bash">docker compose run --rm -T backup keys
+</code></pre>
+<p>Keep what it prints offline.</p>
+<h2>Restore</h2>
+<p>Onto a fresh host carrying the same compose file, licence folder, <code>pitstop.yaml</code> and <code>.env</code>:</p>
+<pre><code class="language-bash">docker compose run --rm -T restore-state &lt; pitstop-backup.tar
+</code></pre>
+<pre><code class="language-bash">docker compose run --rm -T restore-data &lt; pitstop-backup.tar
+</code></pre>
+<pre><code class="language-bash">docker compose up -d --wait
+</code></pre>
+<h2>Replace the licence or the secret</h2>
+<p>A new key file from the portal goes over the old one, then one start with the new secret exported:</p>
+<pre><code class="language-bash">cp /path/to/NEW-KEY-FILE.json licence/licence.json
+</code></pre>
+<pre><code class="language-bash">LICENSE_SECRET=… docker compose up -d --wait
+</code></pre>
+<p>No reset is needed; the first start stored the secret inside the stack, so afterwards <code>unset LICENSE_SECRET</code>.</p>
+<h2>A failed start, and the clean retry</h2>
+<p>First see whether setup finished:</p>
+<pre><code class="language-bash">docker compose ps -a setup
+</code></pre>
+<ul>
+<li>Not <code>Exited (0)</code>: fix the cause (<a href="reference-troubleshooting.html">When something fails</a>) and run <code>docker compose up -d --wait</code> again. Nothing needs resetting.</li>
+<li><code>Exited (0)</code>: setup is done; read the failing service&#39;s last lines (<code>docker compose logs --tail 20 &lt;service&gt;</code>), fix, <code>docker compose up -d --wait</code>. Only what changed is recreated, and no data is lost.</li>
+</ul>
+<p><code>docker compose down</code> (without <code>-v</code>) is also safe. Only <code>docker compose down -v</code> resets the fixed inputs — and deletes <strong>all</strong> data.</p>
+<p>A host reboot needs nothing: Docker brings the stack back by itself.</p>
+<h2>Uninstall</h2>
+<pre><code class="language-bash">docker compose down -v
+</code></pre>
+<p>deletes all data, irrecoverably — back up first. Then delete the folder and run <code>docker image prune</code>. On a Hosted install, also remove the DNS records and the machine&#39;s entry under <strong>Relay access</strong> in the licence portal.</p>
+<h2>Verify</h2>
+<ul>
+<li>The tour ends with <code>Done.</code> and exit 0.</li>
+<li><code>tar -tf pitstop-backup.tar | head -2</code> prints <code>MANIFEST</code> and <code>SHA256SUMS</code>.</li>
+<li>After a licence replacement, <code>docker compose ps</code> shows <code>relay</code> back to <code>(healthy)</code>.</li>
+</ul>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

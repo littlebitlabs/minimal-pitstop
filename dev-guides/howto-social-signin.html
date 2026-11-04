@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to add Google or GitHub sign-in</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>How to add Google or GitHub sign-in</h1>
+<p>Goal: a <strong>Sign in with Google</strong> (or GitHub) button on the install&#39;s login page, serving every application behind this identity service.</p>
+<h2>Preconditions</h2>
+<ul>
+<li><p>A LAN or Hosted install, decided before the first start. Google accepts only <code>https</code> redirect URIs, so Local mode cannot complete the round trip, and the installer offers the social section only in LAN and Hosted mode.</p>
+</li>
+<li><p>An OAuth <strong>web</strong> client created at the provider, with this redirect URI registered:</p>
+<pre><code class="language-text">https://auth.&lt;your-name&gt;/idps/callback
+</code></pre>
+</li>
+<li><p>Google has been exercised against a real client; GitHub follows the same declaration but has not been exercised — treat it accordingly.</p>
+</li>
+</ul>
+<h2>Declare the client at the first start</h2>
+<p>In the installer, fill the social sign-in fields on the form. By hand, export the pair beside <code>LICENSE_SECRET</code> before the first <code>docker compose up</code>:</p>
+<pre><code class="language-bash">export PITSTOP_IDP_GOOGLE_CLIENT_ID=&#39;1234….apps.googleusercontent.com&#39;
+</code></pre>
+<pre><code class="language-bash">export PITSTOP_IDP_GOOGLE_SECRET=&#39;…&#39;
+</code></pre>
+<p>(GitHub: <code>PITSTOP_IDP_GITHUB_CLIENT_ID</code> and <code>PITSTOP_IDP_GITHUB_SECRET</code>.) The secret is handed over once; the identity service stores it, and the stack writes it to no file or log.</p>
+<h2>Who may actually sign in</h2>
+<ul>
+<li><strong>Self-registration through the provider is closed by default</strong>: only a provider account already linked to a user here can use the button; anyone else sees <strong>Account Not Found</strong>.</li>
+<li>To let any Google or GitHub account create a user, also set <code>PITSTOP_IDP_ALLOW_SIGNUP=true</code> at the first start. Such users arrive with <strong>no role</strong> and see no data until an admin grants one — console → <strong>Projects</strong> → <strong>pitstop-platform</strong> → <strong>Role Assignments</strong> (<a href="reference-roles-and-access.html">roles reference</a>).</li>
+</ul>
+<h2>Verify</h2>
+<ul>
+<li>The login page shows the provider&#39;s button.</li>
+<li>A linked account signs in and lands in the console or the app.</li>
+<li>With signup closed, an unlinked provider account gets <strong>Account Not Found</strong> — that is the intended refusal, not a fault.</li>
+</ul>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

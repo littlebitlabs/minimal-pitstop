@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Developer guide: Minimal over MCP</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>Developer guide: Minimal over MCP</h1>
+<p>An AI assistant, or any client that speaks the Model Context Protocol, can use a running Minimal as a set of tools: it can deploy a Custom API, call it, read and change rows, build an app and read the audit trail. Every call is made as one identity, with that identity&#39;s roles, and every call is recorded.</p>
+<p>This guide works through one install, the CRM dataset, from the first call to a finished app. Each step shows the request, the answer and, where data changes, the sample app in a browser before and after. The same steps ran unchanged on a Local install, on a LAN install and on a Hosted install. Only the address and, on LAN, the trusted certificate differ.</p>
+<p>Before you start you need a running install (<a href="install-local.html">local</a>, <a href="install-lan.html">LAN</a> or <a href="install-hosted.html">Hosted</a>), its admin account and a shell on the machine that runs it.</p>
+<pre class="mermaid">sequenceDiagram
+  participant C as MCP client
+  participant G as Gateway
+  participant M as Minimal
+  C->>G: POST /minimal/mcp/rpc/v1 (token, session id)
+  G->>M: the call
+  M->>M: check token, roles, locks; record the turn
+  M-->>C: the tool's answer as text
+</pre>
+<p><em>A call from client to Minimal. Who you are comes from the token alone; no header you send can override it.</em></p>
+<h2>1. Connect</h2>
+<p>An MCP token is minted by an admin, once, and shown once. On the Ready screen press <strong>Create a token</strong>, or from the install folder:</p>
+<pre><code class="language-bash">docker compose run --rm -T mcp-token
+</code></pre>
+<p>The command prints the MCP address, a token and a session id. The token is named for its use, carries the admin role and lasts seven days. Put the two values in a file only you can read:</p>
+<pre><code class="language-text">LB-Access-Token: &lt;token&gt;
+X-Session-Id: &lt;session id&gt;
+Content-Type: application/json
+Accept: application/json, text/event-stream
+</code></pre>
+<pre><code class="language-bash">chmod 600 headers.txt
+</code></pre>
+<p>Keeping the headers in a file keeps the token out of your shell history and process list. The address is <code>http://api.localhost/minimal/mcp/rpc/v1</code> on a Local install and <code>https://api.&lt;your-name&gt;/minimal/mcp/rpc/v1</code> on LAN and Hosted. On LAN add <code>--cacert pitstop-root.crt</code> to every <code>curl</code> below, with the root certificate from <a href="install-lan.html">the LAN guide</a>.</p>
+<p>List the tools:</p>
+<pre><code class="language-bash">curl -sS -H @headers.txt -X POST http://api.localhost/minimal/mcp/rpc/v1 \
+  -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/list&quot;}&#39;
+</code></pre>
+<pre><code class="language-json">{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;result&quot;:{&quot;ttlMs&quot;:60000,&quot;cacheScope&quot;:&quot;private&quot;,&quot;tools&quot;:[{&quot;annotations&quot;:{&quot;destructiveHint&quot;:false, ...
+</code></pre>
+<p><img src="../guides/images/mcp-01-tools.png" alt="tools/list: 115 tools"></p>
+<p><em>The answer lists 115 tools. Each has a description and an input schema; read both before you call it.</em></p>
+<p>Call a tool with <code>tools/call</code>. The answer is always the tool&#39;s own reply as text:</p>
+<pre><code class="language-bash">curl -sS -H @headers.txt -X POST http://api.localhost/minimal/mcp/rpc/v1 \
+  -d &#39;{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;method&quot;:&quot;tools/call&quot;,&quot;params&quot;:{&quot;name&quot;:&quot;get_org_details&quot;,&quot;arguments&quot;:{}}}&#39;
+</code></pre>
+<pre><code class="language-json">{&quot;jsonrpc&quot;:&quot;2.0&quot;,&quot;id&quot;:1,&quot;result&quot;:{&quot;content&quot;:[{&quot;type&quot;:&quot;text&quot;,&quot;text&quot;:&quot;{\&quot;abbreviation\&quot;:\&quot;acme\&quot;, ...}&quot;}]}}
+</code></pre>
+<p>In the rest of this guide a call is shown as the tool name and its <code>arguments</code>, and the answer as the text it returns.</p>
+<p><img src="../guides/images/mcp-02-organisation.png" alt="get_org_details"></p>
+<p><em>Your organisation, read with <code>get_org_details</code>.</em></p>
+<h2>2. Find your identifiers</h2>
+<p>A Custom API names your organisation, project, space and user. Read them from your own audit trail: every row carries them.</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;read_my_audit_trail&quot;,&quot;arguments&quot;:{&quot;page_size&quot;:4,&quot;page_number&quot;:0}}
+</code></pre>
+<p><img src="../guides/images/mcp-33-audit.png" alt="The audit trail"></p>
+<p><em>Each row names <code>org_id</code>, <code>project_id</code>, <code>space_id</code> and <code>user_id</code>, the call&#39;s URI and its status.</em></p>
+<p>On the CRM install they are <code>01JPITSTOPACMEORG000000000</code>, <code>01JPITSTOPACMEPEOPLE000000</code>, <code>01JPITSTOPACMEDEV000000000</code> and <code>mcp:claude</code> (the token&#39;s name).</p>
+<h2>3. Deploy a Custom API and call it</h2>
+<p>A Custom API is an endpoint you declare in one YAML document. It names the path, the roles that may call it, the database it talks to and the steps that run. Here is one that adds a deal.</p>
+<pre><code class="language-yaml">identifiers:
+  org_id: 01JPITSTOPACMEORG000000000
+  project_id: 01JPITSTOPACMEPEOPLE000000
+  space_id: 01JPITSTOPACMEDEV000000000
+  user_id: mcp:claude
+  feature_id: crm
+permission:
+  - admin
+http:
+  method: POST
+  uri: crm/new-deal
+  version: &quot;1&quot;
+  input_type: json
+  output_type: json
+logic:
+  - sql: insert into opportunity (id, account_id, name, stage_id, amount, currency, owner_email, close_on, created_at) values ((select coalesce(max(id), 0) + 1 from opportunity), ?:account_id::int, ?:name, ?:stage_id::int, ?:amount::numeric, &#39;EUR&#39;, ?:owner_email, now()::date + 30, now()) returning id, name, stage_id, amount
+config:
+  rollback_version: &quot;1&quot;
+  coalesce: false
+  cache_result: false
+database:
+  type: postgres
+  username: acme_core
+  password: &lt;db-password&gt;
+  name: acme
+  timeout_secs: 60
+  idle_timeout_secs: 60
+  max_open_connections: 5
+  max_idle_connections: 2
+  machine:
+    - host: pg-app
+      port: &quot;5432&quot;
+mcp:
+  enabled: true
+  mcp_roles:
+    - admin
+</code></pre>
+<p>The password is the one the installer generated for the <code>acme_core</code> database role. It is a secret; read it into a file and keep it out of chat:</p>
+<pre><code class="language-bash">docker compose run --rm -T --no-deps --entrypoint cat provision /state/pg_app_core &gt; db-password.txt
+</code></pre>
+<p>Send the document to <code>create_definition</code>. The endpoint is live when the call succeeds:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;create_definition&quot;,&quot;arguments&quot;:{&quot;document&quot;:&quot;&lt;the YAML above, as one string&gt;&quot;}}
+</code></pre>
+<pre><code class="language-json">{&quot;definition_id&quot;: &quot;01M6E3CTZ8KAVWCWAAKBEMABGP&quot;, &quot;final_url&quot;: &quot;acme/crm/crm/new-deal&quot;}
+</code></pre>
+<p><img src="../guides/images/mcp-05-deploy-write-api.png" alt="create_definition"></p>
+<p><em>The document and the answer. The password is masked in the screenshot.</em></p>
+<p><code>final_url</code> is the stored path: your project&#39;s prefix is put in front of the <code>uri</code> you wrote. <code>call_api</code> takes it, a method and a version. For <code>post</code> the <code>body</code> is the endpoint&#39;s input.</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;call_api&quot;,&quot;arguments&quot;:{&quot;uri&quot;:&quot;acme/crm/crm/new-deal&quot;,&quot;method&quot;:&quot;post&quot;,&quot;version&quot;:&quot;1&quot;,&quot;body&quot;:{&quot;account_id&quot;:1,&quot;name&quot;:&quot;MCP demo deal&quot;,&quot;stage_id&quot;:1,&quot;amount&quot;:&quot;125000&quot;,&quot;owner_email&quot;:&quot;demo@example.com&quot;}}}
+</code></pre>
+<pre><code class="language-json">[{&quot;amount&quot;:125000,&quot;id&quot;:41,&quot;name&quot;:&quot;MCP demo deal&quot;,&quot;stage_id&quot;:1}]
+</code></pre>
+<p><img src="../guides/images/mcp-06-call-write-api.png" alt="call_api"></p>
+<p><em>The endpoint ran and returned the row it inserted.</em></p>
+<p>Open the sample app. Before the call it showed 40 deals; now it shows 41, and the new card is in <strong>Prospect</strong>.</p>
+<p><img src="../guides/images/mcp-04-app-before.png" alt="The app before"></p>
+<p><em>Before: <strong>Pipeline.</strong> with 40 deals.</em></p>
+<p><img src="../guides/images/mcp-07-app-after-insert.png" alt="The app after the insert"></p>
+<p><em>After: the new card, outlined in the screenshot, in the <strong>Prospect</strong> column.</em></p>
+<p>The same call over the other two modes:</p>
+<p><img src="../guides/images/mcp-hosted-call-write-api.png" alt="call_api on a Hosted install"></p>
+<p><em>The call on the Hosted install, over HTTPS on the public domain.</em></p>
+<p><img src="../guides/images/mcp-lan-call-write-api.png" alt="call_api on a LAN install"></p>
+<p><em>The call on the LAN install, with the stack&#39;s root certificate trusted.</em></p>
+<h3>What each section of the document does</h3>
+<ul>
+<li><strong>identifiers</strong> must name your own organisation, project, space and user exactly as your token resolves them; any other value is refused with 403. <code>feature_id</code> is stored as sent.</li>
+<li><strong>permission</strong> lists the roles that may call the endpoint directly over REST.</li>
+<li><strong>mcp</strong> opens the endpoint to agents. <code>call_api</code> admits a caller only when <code>mcp.enabled</code> is true and one of the caller&#39;s roles is in <code>mcp_roles</code>.</li>
+<li><strong>http</strong> gives the method, the path, the version and the input and output types. A path and method are unique in a space; a second document on the same path and method is refused with 409.</li>
+<li><strong>logic</strong> is an ordered list of steps. A step is <code>- sql: &lt;one statement&gt;</code> or <code>- lua: &lt;name&gt;</code> followed by <code>code:</code>. <code>?:name</code> takes the value of the input called <code>name</code>.</li>
+<li><strong>config</strong> and <strong>database</strong> are mandatory. The database block is a full connection, not a reference.</li>
+</ul>
+<h3>Change and manage what is deployed</h3>
+<p>Move the deal to another stage with a second endpoint. <code>update_definition</code> replaces an existing document in full, so build it from the one you sent:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;call_api&quot;,&quot;arguments&quot;:{&quot;uri&quot;:&quot;acme/crm/crm/move-deal&quot;,&quot;method&quot;:&quot;post&quot;,&quot;version&quot;:&quot;1&quot;,&quot;body&quot;:{&quot;id&quot;:41,&quot;stage_id&quot;:4}}}
+</code></pre>
+<pre><code class="language-json">[{&quot;id&quot;:41,&quot;name&quot;:&quot;MCP demo deal&quot;,&quot;stage_id&quot;:4}]
+</code></pre>
+<p><img src="../guides/images/mcp-09-app-after-move.png" alt="The card moved to Negotiation"></p>
+<p><em>The app after the call: the card is in <strong>Negotiation</strong>.</em></p>
+<p>Replace the document, then call it again:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;update_definition&quot;,&quot;arguments&quot;:{&quot;document&quot;:&quot;&lt;the full YAML, with a changed query&gt;&quot;}}
+</code></pre>
+<p><img src="../guides/images/mcp-14-app-after-update.png" alt="The card in Closed Won"></p>
+<p><em>After the replaced endpoint ran with <code>stage_id</code> 5, the card is in <strong>Closed Won</strong>.</em></p>
+<p>List what is deployed, filtered by tag if you like:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;list_definitions&quot;,&quot;arguments&quot;:{&quot;page_size&quot;:20,&quot;page_number&quot;:0}}
+</code></pre>
+<p><img src="../guides/images/mcp-12-list-definitions.png" alt="list_definitions"></p>
+<p><em>Each row gives the URI, method, version and definition id.</em></p>
+<h3>A step in Lua</h3>
+<p>A logic step can be Lua. This endpoint sums a query&#39;s rows:</p>
+<pre><code class="language-yaml">logic:
+  - sql: select s.name as stage, count(o.id) as deals, coalesce(sum(o.amount), 0) as total from stage s left join opportunity o on o.stage_id = s.id group by s.id, s.name order by s.id
+    omit: true
+  - lua: summarise
+    code: |
+      function min_main()
+        local deals, total = 0, 0
+        for i = 1, #step_0 do deals = deals + step_0[i].deals; total = total + step_0[i].total end
+        return { stages = #step_0, deals = deals, total = total }
+      end
+</code></pre>
+<p><code>omit: true</code> keeps that step&#39;s rows out of the answer. Later steps read earlier ones as <code>step_0</code>, <code>step_1</code>, and so on. The function is <code>min_main</code>; it takes no arguments and returns a table.</p>
+<pre><code class="language-json">{&quot;deals&quot;:41,&quot;stages&quot;:6,&quot;total&quot;:1452500}
+</code></pre>
+<p><img src="../guides/images/mcp-11-call-lua-api.png" alt="The Lua endpoint"></p>
+<p><em>The Lua endpoint&#39;s answer.</em></p>
+<h3>Refusals you should expect</h3>
+<table>
+<thead>
+<tr>
+<th>Call</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>call_api</code> on an endpoint that needs an input you left out</td>
+<td><code>the API answered 424 Failed Dependency: … could not execute URI</code></td>
+</tr>
+<tr>
+<td><code>call_api</code> on an endpoint whose <code>mcp.enabled</code> is false, after <code>patch_definition_attributes</code> closed it</td>
+<td><code>403 Forbidden … insufficient permissions for mcp …</code></td>
+</tr>
+<tr>
+<td><code>create_definition</code> on a path and method already used</td>
+<td><code>409 Conflict</code>, <code>definition already exists</code></td>
+</tr>
+<tr>
+<td><code>create_definition</code> with a document that does not compile</td>
+<td><code>400</code>, with the compiler&#39;s message, for example <code>identifier &quot;feature_id&quot; not found</code></td>
+</tr>
+</tbody></table>
+<h2>4. Read and change rows with the Auto API</h2>
+<p>The Auto API is the generic row interface: <code>auto_read_rows</code>, <code>auto_insert_rows</code>, <code>auto_update_rows</code>, <code>auto_delete_rows</code>. Over MCP it is locked on every table at install time, so an assistant reaches your data only through endpoints you deployed. A call is refused:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;auto_read_rows&quot;,&quot;arguments&quot;:{&quot;type&quot;:&quot;pg&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;opportunity&quot;,&quot;page_size&quot;:2,&quot;page_number&quot;:0}}
+</code></pre>
+<pre><code class="language-text">the API answered 403 Forbidden: {&quot;code&quot;:403,&quot;status&quot;:&quot;Forbidden&quot;,&quot;message&quot;:&quot;insufficient permissions for this operation on this table, got [admin]&quot;}
+</code></pre>
+<p><img src="../guides/images/mcp-03-locked-rows.png" alt="The refusal"></p>
+<p><em>An admin MCP session is refused: the table&#39;s lock and its permission template both have to allow the call.</em></p>
+<p>You can open one table on purpose. Two things gate a call: the table&#39;s <strong>lock mask</strong>, which says which operations are allowed on which channel, and the <strong>permission template</strong>, which says which roles may use them. Read the lock first:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;get_table_lock_status&quot;,&quot;arguments&quot;:{&quot;db_type&quot;:&quot;postgres&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;}}
+</code></pre>
+<p><img src="../guides/images/mcp-15-auto-locked.png" alt="The note table's lock status"></p>
+<p><em>On the <code>note</code> table every <code>mcp_*_locked</code> flag is true.</em></p>
+<p>Open the sample app&#39;s <strong>Note</strong> page for a baseline:</p>
+<p><img src="../guides/images/mcp-16-notes-before.png" alt="The Note page before"></p>
+<p><em>The <strong>Note</strong> page before any change.</em></p>
+<p>Create a template that gives <code>admin</code> the four MCP row operations, assign it to the table, and unlock the four operations:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;create_permission_template&quot;,&quot;arguments&quot;:{&quot;name&quot;:&quot;guide-mcp-rows&quot;,&quot;description&quot;:&quot;admin may use the row tools over MCP&quot;,&quot;auto_api_read_roles&quot;:&quot;admin,editor,ops,power,viewer&quot;,&quot;auto_api_create_roles&quot;:&quot;admin,editor&quot;,&quot;auto_api_update_roles&quot;:&quot;admin,editor&quot;,&quot;auto_api_delete_roles&quot;:&quot;admin&quot;,&quot;mcp_create_roles&quot;:&quot;admin&quot;,&quot;mcp_read_roles&quot;:&quot;admin&quot;,&quot;mcp_update_roles&quot;:&quot;admin&quot;,&quot;mcp_delete_roles&quot;:&quot;admin&quot;}}
+</code></pre>
+<pre><code class="language-json">{&quot;name&quot;:&quot;assign_table_permission&quot;,&quot;arguments&quot;:{&quot;db_type&quot;:&quot;postgres&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;,&quot;template_id&quot;:&quot;&lt;the template_id from the answer&gt;&quot;}}
+</code></pre>
+<pre><code class="language-json">{&quot;name&quot;:&quot;set_table_lock_mask&quot;,&quot;arguments&quot;:{&quot;db_type&quot;:&quot;postgres&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;,&quot;mcp_create_locked&quot;:false,&quot;mcp_read_locked&quot;:false,&quot;mcp_update_locked&quot;:false,&quot;mcp_delete_locked&quot;:false}}
+</code></pre>
+<p><img src="../guides/images/mcp-17-template-rows.png" alt="The template and the unlock"></p>
+<p><em>The new template. The unlock is the call below it in the same run.</em></p>
+<p><img src="../guides/images/mcp-18-unlock.png" alt="The four operations unlocked"></p>
+<p><em>The lock status after the unlock.</em></p>
+<p>Now the row tools work. Read, insert, update:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;auto_read_rows&quot;,&quot;arguments&quot;:{&quot;type&quot;:&quot;pg&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;,&quot;page_size&quot;:3,&quot;page_number&quot;:0}}
+</code></pre>
+<p><img src="../guides/images/mcp-19-read-rows.png" alt="Rows read"></p>
+<p><em>The first three notes.</em></p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;auto_insert_rows&quot;,&quot;arguments&quot;:{&quot;type&quot;:&quot;pg&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;,&quot;rows&quot;:[{&quot;id&quot;:1000,&quot;opportunity_id&quot;:1,&quot;body&quot;:&quot;Written by an agent through MCP&quot;,&quot;written_by&quot;:&quot;agent@example.com&quot;,&quot;created_at&quot;:&quot;2026-11-02 12:00:00&quot;}]}}
+</code></pre>
+<pre><code class="language-json">{&quot;rows_affected&quot;: 1}
+</code></pre>
+<p><img src="../guides/images/mcp-20-insert-row.png" alt="The insert"></p>
+<p><em>One row inserted.</em></p>
+<p><img src="../guides/images/mcp-21-notes-after-insert.png" alt="The Note page shows the new row"></p>
+<p><em>The <strong>Note</strong> page, searched for the new text, shows the row the assistant wrote.</em></p>
+<p><code>set</code> is a list of <code>column.value</code> pairs and <code>query</code> says which rows: a key is a column and its value is <code>operator.operand</code>, here <code>eq.1000</code>.</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;auto_update_rows&quot;,&quot;arguments&quot;:{&quot;type&quot;:&quot;pg&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;,&quot;set&quot;:&quot;body.Edited by an agent through MCP&quot;,&quot;query&quot;:{&quot;id&quot;:&quot;eq.1000&quot;}}}
+</code></pre>
+<p><img src="../guides/images/mcp-22-update-row.png" alt="The update"></p>
+<p><em>One row updated.</em></p>
+<p><img src="../guides/images/mcp-23-notes-after-update.png" alt="The Note page shows the edit"></p>
+<p><em>The edited text in the app.</em></p>
+<p>A delete is refused here, and not by the MCP lock. The <code>note</code> table is locked against deletes for every caller, over every channel:</p>
+<pre><code class="language-text">the API answered 403 Forbidden: {&quot;code&quot;:403,&quot;status&quot;:&quot;Forbidden&quot;,&quot;message&quot;:&quot;insufficient permissions for this operation on this table, got [admin]&quot;}
+</code></pre>
+<p><img src="../guides/images/mcp-24-delete-refused.png" alt="The delete refused"></p>
+<p><em>The table&#39;s own delete lock.</em></p>
+<p>That lock is the owner&#39;s decision. Lift it for the demonstration, delete, and see the row go:</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;set_table_lock_mask&quot;,&quot;arguments&quot;:{&quot;db_type&quot;:&quot;postgres&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;,&quot;table_delete_locked&quot;:false}}
+</code></pre>
+<pre><code class="language-json">{&quot;name&quot;:&quot;auto_delete_rows&quot;,&quot;arguments&quot;:{&quot;type&quot;:&quot;pg&quot;,&quot;schema&quot;:&quot;acme&quot;,&quot;table&quot;:&quot;note&quot;,&quot;query&quot;:{&quot;id&quot;:&quot;eq.1000&quot;}}}
+</code></pre>
+<p><img src="../guides/images/mcp-25-lift-delete-lock.png" alt="The delete lock lifted"></p>
+<p><em>The lock status with deletes allowed.</em></p>
+<p><img src="../guides/images/mcp-26-delete-row.png" alt="The delete"></p>
+<p><em>One row deleted.</em></p>
+<p><img src="../guides/images/mcp-27-notes-after-delete.png" alt="The Note page after the delete"></p>
+<p><em>The <strong>Note</strong> page is back to its original rows.</em></p>
+<p>A delete without a filter is refused, so a whole table cannot be emptied by accident:</p>
+<pre><code class="language-text">the API answered 417 Expectation Failed: {&quot;code&quot;:417,&quot;status&quot;:&quot;Expectation Failed&quot;,&quot;message&quot;:&quot;unable to perform delete&quot;,&quot;details&quot;:&quot;a valid SQL statement could not be formed reason: blanket delete detected, rejecting request&quot;}
+</code></pre>
+<h3>Put the table back</h3>
+<p>Restore every lock flag to its first value, assign the original template back and delete yours. The first <code>get_table_lock_status</code> is your reference: afterwards its <code>lock_mask</code> and <code>permission_template_id</code> must match.</p>
+<p><img src="../guides/images/mcp-28-restored.png" alt="The table as it was"></p>
+<p><em>After the restore the lock mask and template equal the first reading.</em></p>
+<h2>5. Build an app</h2>
+<p>An app in Minimal is a catalogue entry. Its <code>app_info</code> is free-form, base64-encoded, and is handed back as HTML. An assistant can therefore read live data through a Custom API, write a page and store it.</p>
+<ol>
+<li>Deploy a read endpoint for the data (<code>crm/stage-summary</code>: deals and value per stage) and call it.</li>
+<li>Build a page from the answer and create the app. <code>is_public</code> lets <code>render_app</code> serve it to any caller who can read the project.</li>
+</ol>
+<pre><code class="language-json">{&quot;name&quot;:&quot;create_apps&quot;,&quot;arguments&quot;:{&quot;apps&quot;:[{&quot;app_id&quot;:&quot;01JGUIDEAPP0000000000PIPE1&quot;,&quot;name&quot;:&quot;Pipeline by stage&quot;,&quot;kind&quot;:&quot;dashboard&quot;,&quot;description&quot;:&quot;Deals and value per stage, built over MCP&quot;,&quot;creator_type&quot;:&quot;human&quot;,&quot;is_public&quot;:true,&quot;shared&quot;:true,&quot;app_info&quot;:&quot;&lt;the page, base64-encoded&gt;&quot;}]}}
+</code></pre>
+<pre><code class="language-json">{&quot;rows_affected&quot;: 1}
+</code></pre>
+<p><img src="../guides/images/mcp-30-create-app.png" alt="create_apps"></p>
+<p><em>The app registered. The answer is a count; send your own <code>app_id</code> if you need it back.</em></p>
+<ol start="3">
+<li>Render it and save the answer as an HTML file:</li>
+</ol>
+<pre><code class="language-json">{&quot;name&quot;:&quot;render_app&quot;,&quot;arguments&quot;:{&quot;app_id&quot;:&quot;01JGUIDEAPP0000000000PIPE1&quot;}}
+</code></pre>
+<p><img src="../guides/images/mcp-31-render-app.png" alt="render_app"></p>
+<p><em>The stored page, returned as text.</em></p>
+<ol start="4">
+<li>Open the file in a browser:</li>
+</ol>
+<p><img src="../guides/images/mcp-32-built-app.png" alt="The app built over MCP"></p>
+<p><em>The page the assistant built from live data: deals and value per stage.</em></p>
+<p><img src="../guides/images/mcp-hosted-built-app.png" alt="The same app from a Hosted install"></p>
+<p><em>The same steps on the Hosted install.</em></p>
+<h2>6. Tokens, sessions and the audit trail</h2>
+<p><code>create_access_token</code> mints a token for another client. Its roles must be a subset of yours, and <code>key_type</code> is four characters in create, read, update, delete order: a letter where the operation is allowed and <code>-</code> where it is not.</p>
+<pre><code class="language-json">{&quot;name&quot;:&quot;create_access_token&quot;,&quot;arguments&quot;:{&quot;name&quot;:&quot;guide-reader&quot;,&quot;roles&quot;:&quot;admin&quot;,&quot;key_type&quot;:&quot;-r--&quot;,&quot;token_type&quot;:&quot;mcp&quot;,&quot;expires_in_days&quot;:1}}
+</code></pre>
+<p><img src="../guides/images/mcp-29-mint-token.png" alt="A token minted"></p>
+<p><em>The answer carries the new token once; it is masked in the screenshot. <code>list_access_tokens</code> and <code>delete_access_token</code> list and revoke.</em></p>
+<p>Every call you make is recorded to your session, and <code>read_my_audit_trail</code> shows the trail, as in section 2. Deleting what you deployed is part of the loop: <code>delete_definition</code>, <code>delete_app</code> and <code>delete_lua_module</code> remove their objects.</p>
+<h2>Check yourself</h2>
+<ul>
+<li><code>tools/list</code> answers with 115 tools.</li>
+<li>A <code>create_definition</code> on a path that exists answers <code>409 Conflict</code>; a document without <code>feature_id</code> answers <code>400</code>.</li>
+<li>After the <code>crm/new-deal</code> call the app shows 41 deals; after you delete the row it is 40 again.</li>
+<li><code>auto_read_rows</code> on a locked table is refused with <code>403</code>; after you unlock it and assign a template that names your role, it answers with rows.</li>
+<li>After section 4&#39;s restore, <code>get_table_lock_status</code> returns the same <code>lock_mask</code> and template as at the start.</li>
+<li><code>render_app</code> returns HTML for an app whose <code>is_public</code> is true.</li>
+</ul>
+<h2>Limits</h2>
+<ul>
+<li>Deployed endpoints and apps live in the install&#39;s definition store. They are not part of the data tables, and <code>docker compose down -v</code> erases them with the rest.</li>
+<li>A token&#39;s secret is shown once. Revoke it with <code>delete_access_token</code>, or with <code>docker compose run --rm -T mcp-token --revoke &lt;token id&gt;</code>.</li>
+<li>Switching MCP off removes the listener: with <code>mcp: false</code> in <code>pitstop.yaml</code>, or <code>PITSTOP_MCP=false</code>, nothing answers and no token works.</li>
+</ul>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

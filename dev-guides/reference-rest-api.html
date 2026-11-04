@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference: the REST API</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>Reference: the REST API</h1>
+<p>Every registered table gets a REST API, governed by the caller&#39;s roles. This guide builds one real call from nothing — the address, the token, the query — and then gives the grammar. The examples run on a Local install with the CRM dataset; on LAN and Hosted only the addresses change (and LAN adds <code>--cacert pitstop-root.crt</code>).</p>
+<h2>The address shape</h2>
+<p>A table read is:</p>
+<pre><code class="language-text">&lt;api&gt;/minimal/api/rest/auto/v1/&lt;org_slug&gt;/&lt;project_slug&gt;/pg/&lt;schema&gt;/&lt;table&gt;
+</code></pre>
+<p>The two slugs are published by your install, with no sign-in, at <code>&lt;api&gt;/app/config/config.json</code>:</p>
+<pre><code class="language-bash">curl -sS http://api.localhost/app/config/config.json
+</code></pre>
+<pre><code class="language-json">{
+  &quot;org_slug&quot;: &quot;acme&quot;,
+  &quot;project_slug&quot;: &quot;crm&quot;,
+  &quot;project_id&quot;: &quot;397826712638849027&quot;,
+  &quot;...&quot;: &quot;...&quot;
+}
+</code></pre>
+<p>The sample datasets keep their tables in the schema <code>acme</code>, so CRM&#39;s <code>account</code> table is:</p>
+<pre><code class="language-text">http://api.localhost/minimal/api/rest/auto/v1/acme/crm/pg/acme/account
+</code></pre>
+<p>The API collection the installer offers (Postman, Bruno, Insomnia or OpenAPI) carries the exact address of every table in your dataset.</p>
+<h2>A token</h2>
+<p>The API takes an OAuth2 bearer token from the install&#39;s own identity service. The demo service users exist for exactly this: the environment file from the installer&#39;s Ready screen — or, on the stack&#39;s machine, <code>docker compose run --rm -T postman-env</code> — carries their credentials and every address. With that file saved as <code>crm.postman_environment.json</code>:</p>
+<pre><code class="language-bash">jq -r &#39;.values | map({(.key):.value}) | add | &quot;user = &quot; + ((.client_id+&quot;:&quot;+.client_secret)|@json)&#39; crm.postman_environment.json \
+  | curl -sS -m 15 -K - http://auth.localhost/oauth/v2/token \
+      -d grant_type=client_credentials \
+      --data-urlencode &quot;scope=openid profile urn:zitadel:iam:org:project:id:&lt;project_id&gt;:aud urn:zitadel:iam:org:projects:roles&quot;
+</code></pre>
+<p><code>&lt;project_id&gt;</code> is the <code>project_id</code> from <code>config.json</code> above. The answer carries <code>access_token</code>; the <code>jq | curl -K -</code> shape keeps the credentials out of your shell history and process list, which is how every secret should travel. The environment&#39;s <code>client_id</code>/<code>client_secret</code> are the editor; <code>client_id_viewer</code>/<code>client_secret_viewer</code> are the viewer.</p>
+<h2>The first read</h2>
+<p>With the token in a curl config file (again: never on the command line):</p>
+<pre><code class="language-bash">printf &#39;header = &quot;Authorization: Bearer %s&quot;\n&#39; &quot;$TOKEN&quot; | curl -sS -m 15 -K - \
+  &quot;http://api.localhost/minimal/api/rest/auto/v1/acme/crm/pg/acme/account?fc=id,name&amp;oy=id.as&amp;ps=3&amp;pg=0&quot;
+</code></pre>
+<pre><code class="language-json">[{&quot;id&quot;:1,&quot;name&quot;:&quot;Borealis Freight&quot;},{&quot;id&quot;:2,&quot;name&quot;:&quot;Cinder Analytics&quot;},{&quot;id&quot;:3,&quot;name&quot;:&quot;Dunlin Hotels&quot;}]
+</code></pre>
+<h2>The grammar</h2>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Meaning</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>fc</code></td>
+<td>the columns to return</td>
+<td><code>fc=id,name,stage_id,amount</code></td>
+</tr>
+<tr>
+<td><code>&lt;column&gt;=&lt;op&gt;.&lt;value&gt;</code></td>
+<td>a filter</td>
+<td><code>id=eq.3</code></td>
+</tr>
+<tr>
+<td><code>oy</code></td>
+<td>order</td>
+<td><code>oy=id.as</code> (ascending by <code>id</code>)</td>
+</tr>
+<tr>
+<td><code>ps</code>, <code>pg</code></td>
+<td>page size and page number — <strong>mandatory</strong></td>
+<td><code>ps=3&amp;pg=0</code></td>
+</tr>
+</tbody></table>
+<p>The same shape on the <code>opportunity</code> table:</p>
+<pre><code class="language-bash">&quot;…/acme/crm/pg/acme/opportunity?fc=id,name,stage_id,amount&amp;oy=id.as&amp;ps=3&amp;pg=0&quot;
+</code></pre>
+<pre><code class="language-json">[{&quot;amount&quot;:6375.00,&quot;id&quot;:1,&quot;name&quot;:&quot;Deal 1 — pilot&quot;,&quot;stage_id&quot;:1},
+ {&quot;amount&quot;:7750.00,&quot;id&quot;:2,&quot;name&quot;:&quot;Deal 2 — expansion&quot;,&quot;stage_id&quot;:2},
+ {&quot;amount&quot;:9125.00,&quot;id&quot;:3,&quot;name&quot;:&quot;Deal 3 — renewal&quot;,&quot;stage_id&quot;:3}]
+</code></pre>
+<h2>Writes</h2>
+<p>A write is a request against the same address — <code>POST</code> with a JSON array of rows to insert, <code>DELETE</code> with a filter — and the table&#39;s access class decides whether your role may make it (<a href="reference-roles-and-access.html">who sees what</a>). On CRM, as the editor, an insert into the working-class <code>opportunity</code> table answers:</p>
+<pre><code class="language-json">{&quot;rows_affected&quot;: 1}
+</code></pre>
+<p>The same insert as the viewer is refused:</p>
+<pre><code class="language-json">{&quot;code&quot;:403,&quot;status&quot;:&quot;Forbidden&quot;,&quot;message&quot;:&quot;insufficient permissions for this operation on this table, got [viewer]&quot;}
+</code></pre>
+<p>and a <code>DELETE</code> is refused even for the editor, with <code>got [editor]</code>. A refusal names the role it judged, so a surprising 403 tells you which identity you actually sent.</p>
+<h2>What else to know</h2>
+<ul>
+<li>A burst well past the per-address rate limit at the edge is refused; back off and retry.</li>
+<li>Reads and writes beyond the Auto API — endpoints with their own SQL and Lua, open to agents — are Custom APIs, covered end to end in <a href="mcp-developer-guide.html#3-deploy-a-custom-api-and-call-it">Minimal over MCP</a>.</li>
+<li>Every call is subject to the same roles whatever the channel: the app, your code and an AI assistant hit the same wall in the same place.</li>
+</ul>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

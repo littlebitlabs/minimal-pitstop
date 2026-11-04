@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference: identity, roles and who sees what</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>Reference: identity, roles and who sees what</h1>
+<p>Every call to Minimal is made as one identity, and Core enforces that identity&#39;s roles on every table. This guide names the roles an install ships with, who holds them, and what each may do — worked on the CRM dataset.</p>
+<h2>The four roles</h2>
+<p>The project <code>pitstop-platform</code> in the identity console defines four roles:</p>
+<p><img src="images/roles-01-project-roles.png" alt="The project's Roles page"></p>
+<p><em>The four project roles: <code>admin</code>, <code>editor</code>, <code>schema</code> and <code>viewer</code>.</em></p>
+<ul>
+<li><code>viewer</code> reads the open tables and is refused the rest.</li>
+<li><code>editor</code> reads more (the staff tables among them) and may create and change rows where the dataset allows writes.</li>
+<li><code>admin</code> reads everything, including the restricted tables.</li>
+<li><code>schema</code> is not a data role: it is the right to change database shape through Minimal Studio, and only the first admin holds it (<a href="howto-minimal-studio.html">Connect Minimal Studio</a>).</li>
+</ul>
+<h2>Who holds what after an install</h2>
+<p><img src="images/roles-02-role-assignments.png" alt="The project's Role Assignments page"></p>
+<p><em>The shipped grants: three demo service users with one role each, and the human admin with <code>admin</code> and <code>schema</code>.</em></p>
+<ul>
+<li><strong>Pitstop Admin</strong> — the first human user (<code>admin@pitstop.auth.&lt;name&gt;</code>): <code>admin</code> and <code>schema</code>.</li>
+<li><strong>svc-editor</strong>, <strong>svc-viewer</strong>, <strong>svc-admin</strong> — demo service accounts with <code>editor</code>, <code>viewer</code> and <code>admin</code>. Their credentials are in the API environment file the installer offers (<a href="reference-rest-api.html">The REST API</a>); they exist so you can try each role without creating users.</li>
+</ul>
+<p>Service accounts live under <strong>Users → Service Accounts</strong> in the console; humans under <strong>Users</strong>.</p>
+<p>Anyone who can reach the sign-in page can register an account — and a registered account has <strong>no roles</strong> and sees no data. &quot;Core refused this read for your roles&quot; is the permission system working. To grant a role: console → <strong>Projects</strong> → <strong>pitstop-platform</strong> → <strong>Role Assignments</strong> → <strong>New</strong>.</p>
+<h2>What each role gets: access classes</h2>
+<p>Every table in a dataset carries an access class — open, working, staff, ledger or restricted — and the class decides who reads and who writes. The installer&#39;s <strong>Start with.</strong> screen describes your dataset&#39;s split under <strong>Who sees what</strong>.</p>
+<p>On the CRM dataset:</p>
+<ul>
+<li><p>The <code>quota</code> table is staff-class: an editor reads it (HTTP 200), a viewer is refused:</p>
+<pre><code class="language-text">HTTP 403
+insufficient permissions for this operation on this table, got [viewer]
+</code></pre>
+</li>
+<li><p>The <code>opportunity</code> table is working-class: an editor&#39;s insert succeeds (<code>{&quot;rows_affected&quot;: 1}</code>), a viewer&#39;s insert is refused with the same 403.</p>
+</li>
+<li><p>Deleting over the API is refused even for roles that write — a delete on <code>opportunity</code> as the editor answers:</p>
+<pre><code class="language-text">HTTP 403
+insufficient permissions for this operation on this table, got [editor]
+</code></pre>
+</li>
+</ul>
+<p>Read-only is the shipped posture everywhere else: a write to a table whose class does not allow it is a 403, whoever asks. Widening that — like opening a table&#39;s rows to MCP — is an explicit, reversible act by an admin, shown step by step in <a href="mcp-developer-guide.html#4-read-and-change-rows-with-the-auto-api">Minimal over MCP</a>.</p>
+<pre class="mermaid">flowchart LR
+  V[viewer] -->|reads open tables| T[(tables)]
+  E[editor] -->|reads + writes working tables| T
+  A[admin] -->|reads all, restricted included| T
+  S[schema] -->|changes shape via Studio| T
+</pre>
+<p><em>Roles widen from viewer to admin; <code>schema</code> changes the shape, not the rows.</em></p>
+<h2>The MCP channel is its own gate</h2>
+<p>An MCP session&#39;s roles come from its token, and on top of the role check every table starts <strong>locked</strong> for MCP row operations — even an admin token is refused until the table&#39;s lock mask and permission template both allow the call. Deployed Custom APIs are the intended path for agents; <a href="mcp-developer-guide.html">Minimal over MCP</a> shows both the refusal and the deliberate unlock.</p>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

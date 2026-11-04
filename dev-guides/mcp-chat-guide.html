@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial: work with Minimal from a Claude Code chat</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>Tutorial: work with Minimal from a Claude Code chat</h1>
+<p>You will connect Claude Code to a running Minimal and then simply ask for things: list what is there, add a record, move it, write a note. Claude picks the tools; you watch the sample app change. This is the same Minimal and the same tools as in <a href="mcp-developer-guide.html">Minimal over MCP</a>, which does everything with <code>curl</code>. Read that guide when you want to know exactly what each call sends.</p>
+<p>This guide was run on a Hosted install. The chat images are transcripts of the session&#39;s tool calls, one image per prompt; the app images are screenshots of the sample app in a browser.</p>
+<h2>What you need</h2>
+<ul>
+<li>A running install with MCP on (the default), reachable by name over HTTPS: a <a href="install-hosted.html">Hosted</a> install, or a <a href="install-lan.html">LAN</a> one whose certificate your machine trusts. On a Local install the address <code>api.localhost</code> did not connect from Claude Code in our test, so use a LAN or Hosted install.</li>
+<li>An admin MCP token and its session id, from <strong>Create a token</strong> on the Ready screen or <code>docker compose run --rm -T mcp-token</code>.</li>
+<li>Claude Code installed on your machine.</li>
+</ul>
+<p>Claude&#39;s web connectors cannot use this endpoint: they send no static headers, and Minimal&#39;s MCP address needs two. Claude Desktop reaches it through the <code>mcp-remote</code> bridge shown on the Ready screen.</p>
+<h2>1. Connect</h2>
+<p>The Ready screen prints a one-line command under <strong>Connect Claude Code</strong>. It looks like this, with your address, token and session id:</p>
+<pre><code class="language-bash">claude mcp add --transport http --scope user pitstop-minimal https://api.pitstop.example.com/minimal/mcp/rpc/v1 --header &quot;LB-Access-Token: &lt;token&gt;&quot; --header &quot;X-Session-Id: &lt;session id&gt;&quot;
+</code></pre>
+<p>Claude Code stores the two headers in plain text in <code>~/.claude.json</code>. Treat that file like a password. Check the connection:</p>
+<pre><code class="language-bash">claude mcp list | grep pitstop-minimal
+</code></pre>
+<p><img src="../guides/images/mcp-chat-00-connected.png" alt="claude mcp list shows the server connected"></p>
+<p><em>The server is listed and connected.</em></p>
+<p>Start a new Claude Code session so it loads the server&#39;s tools. They appear under the name <code>pitstop-minimal</code>.</p>
+<h2>2. Prepare the endpoints you want Claude to use</h2>
+<p>Claude changes data through Custom APIs that an operator opened to agents. Creating a Custom API needs the database password, which should never go into a chat, so you deploy these once, outside the chat, as in <a href="mcp-developer-guide.html#3-deploy-a-custom-api-and-call-it">the developer guide</a>. This guide uses three that work by name, so you never have to give an id:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Input</th>
+<th>What it runs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>crm/new-deal</code></td>
+<td>POST</td>
+<td><code>account</code>, <code>name</code>, <code>stage</code>, <code>amount</code>, <code>owner_email</code></td>
+<td>an <code>insert into opportunity</code> that looks the account and stage up by name</td>
+</tr>
+<tr>
+<td><code>crm/move-deal</code></td>
+<td>POST</td>
+<td><code>name</code>, <code>stage</code></td>
+<td>an <code>update opportunity set stage_id = (select id from stage where name = ?:stage) where name = ?:name</code></td>
+</tr>
+<tr>
+<td><code>crm/stage-summary</code></td>
+<td>GET</td>
+<td>none</td>
+<td>deals and value per stage</td>
+</tr>
+</tbody></table>
+<p>Each document has <code>mcp.enabled: true</code> and <code>mcp_roles: [admin]</code>.</p>
+<p>Open the sample app first for a baseline: 40 deals.</p>
+<p><img src="../guides/images/mcp-chat-ui-0-before.png" alt="The app before"></p>
+<p><em>The sample app before any prompt: <strong>Pipeline.</strong> with 40 deals.</em></p>
+<h2>3. Talk to it</h2>
+<p>Type each prompt into the chat. Each prompt below was run in a real session.</p>
+<h3>Check the connection</h3>
+<blockquote>
+<p>Can you reach my Minimal?</p>
+</blockquote>
+<p><img src="../guides/images/mcp-chat-01-connect.png" alt="Prompt: can you reach my Minimal"></p>
+<p><em>Claude calls <code>ping</code> and reports the endpoint reachable.</em></p>
+<h3>See what is there</h3>
+<blockquote>
+<p>What is in my Minimal? Which tables, and which Custom APIs are deployed?</p>
+</blockquote>
+<p><img src="../guides/images/mcp-chat-02-explore.png" alt="Prompt: what is in my Minimal"></p>
+<p><em>Claude lists the eight tables and the three Custom APIs.</em></p>
+<h3>Add a record</h3>
+<blockquote>
+<p>Add a deal called &quot;Chat demo deal&quot; worth EUR 90,000 for Borealis Freight in the Prospect stage.</p>
+</blockquote>
+<p><img src="../guides/images/mcp-chat-03-add-deal.png" alt="Prompt: add a deal"></p>
+<p><em>Claude reads the endpoint&#39;s definition to learn its inputs, then calls it. You did not name an owner, so Claude picks one and says so; check what it chose.</em></p>
+<p>The app now has the deal in <strong>Prospect</strong>.</p>
+<p><img src="../guides/images/mcp-chat-ui-1-after-insert.png" alt="The new card in Prospect"></p>
+<p><em>The app after the prompt: the new card, outlined in the screenshot, in the <strong>Prospect</strong> column.</em></p>
+<h3>Change it and summarise</h3>
+<blockquote>
+<p>Move that deal to Negotiation, then give me the pipeline totals.</p>
+</blockquote>
+<p><img src="../guides/images/mcp-chat-04-move-deal.png" alt="Prompt: move the deal"></p>
+<p><em>Two calls: the move, then the summary. The totals add up to 41 deals.</em></p>
+<p><img src="../guides/images/mcp-chat-ui-2-after-move.png" alt="The card in Negotiation"></p>
+<p><em>The card is now in the <strong>Negotiation</strong> column.</em></p>
+<h3>Use the row tools, then put everything back</h3>
+<blockquote>
+<p>Open the Note table for yourself, add a note on that deal saying I spoke to the champion and the budget is confirmed, read it back, then lock the table exactly as it was.</p>
+</blockquote>
+<p><img src="../guides/images/mcp-chat-05-note.png" alt="Prompt: write a note"></p>
+<p><em>Ten calls. Claude reads the table&#39;s lock status first, creates a temporary permission template, assigns it, unlocks the four MCP operations, inserts and reads the row, then reverses each step and deletes the template. The last call shows the same lock mask and template as the first.</em></p>
+<p><img src="../guides/images/mcp-chat-ui-3-note.png" alt="The Note page shows the row"></p>
+<p><em>The <strong>Note</strong> page, searched for the new text, shows the row Claude wrote.</em></p>
+<p>The <code>note</code> table is also locked against deletes for every caller. Claude did not lift that lock, so the note stays in the table. Ask for it if you want it gone, and remember that lifting a table&#39;s own lock is your decision.</p>
+<h2>What to watch for</h2>
+<ul>
+<li><strong>Claude fills in what you leave out.</strong> It chose the deal&#39;s owner. Read the reply, not only the result.</li>
+<li><strong>A change to who may do what is a real change.</strong> Opening a table to MCP rows, or lifting a lock, widens what an assistant can do. Ask Claude to reverse it and to prove it, as in the last prompt.</li>
+<li><strong>Every call is recorded</strong> under the session id in your connector, and <code>read_my_audit_trail</code> returns the rows. Revoke the token when you are done: <code>docker compose run --rm -T mcp-token --revoke &lt;token id&gt;</code>.</li>
+<li>Approvals follow your Claude Code permission settings; you can approve each tool call or allow the server for the session.</li>
+</ul>
+<h2>Check yourself</h2>
+<ul>
+<li><code>claude mcp list</code> shows <code>pitstop-minimal</code> as <code>✓ Connected</code>.</li>
+<li>After the second prompt the app shows 41 deals and a card named <strong>Chat demo deal</strong> in <strong>Prospect</strong>.</li>
+<li>After the third prompt the card is in <strong>Negotiation</strong> and the totals add up to 41 deals.</li>
+<li>After the last prompt the Note page lists the new note, and <code>get_table_lock_status</code> for <code>note</code> shows the same <code>lock_mask</code> as before.</li>
+</ul>
+<h2>Remove it</h2>
+<p>Delete the demo rows when you are finished, remove the connector with <code>claude mcp remove pitstop-minimal -s user</code>, and revoke the token.</p>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

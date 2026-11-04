@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to run Minimal on a LAN host</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>How to run Minimal on a LAN host</h1>
+<p>Goal: one machine runs Minimal, and other devices on your network use it over HTTPS with a certificate the stack signs itself. You trust that certificate once on each device.</p>
+<p>Use this mode when the machine is not on the internet. For a public server with a real domain, use <a href="install-hosted.html">Put Minimal on the internet</a>.</p>
+<p>The screenshots were taken on a server on a private network, with its address masked. In the text the address is written <code>xx.yy.zz.aa</code>; use your machine&#39;s.</p>
+<h2>Before you start</h2>
+<ul>
+<li>A machine with Docker Engine 26 or later and the Compose plugin, ports 80 and 443 free, and the same inputs as <a href="install-local.html">the local tutorial</a>: key file, secret, slug, and this machine&#39;s public address under <strong>Relay access</strong> in the licence portal.</li>
+<li>A name that devices on your network resolve to the machine. The easiest is its address with dashes under <code>nip.io</code>: for <code>xx.yy.zz.aa</code> use <code>xx-yy-zz-aa.nip.io</code>. The stack then answers on <code>auth.xx-yy-zz-aa.nip.io</code> and <code>api.xx-yy-zz-aa.nip.io</code>.</li>
+<li>The installer must run on the machine that will host Minimal. From your laptop, tunnel to it:</li>
+</ul>
+<pre><code class="language-bash">ssh -L 8070:localhost:8070 you@xx.yy.zz.aa
+</code></pre>
+<h2>Steps</h2>
+<ol>
+<li><p>On the server, make the folder, fetch the compose file and start the installer, exactly as in <a href="install-local.html">the local tutorial</a>, then open the one-time address in your laptop&#39;s browser. The first page is <strong>Hello.</strong>; press <strong>Continue</strong>.</p>
+<p><img src="../guides/images/install-lan-00-welcome.png" alt="The first page of the installer"></p>
+<p><em>The installer&#39;s first page.</em></p>
+</li>
+<li><p>On <strong>Where will this run?</strong> choose <strong>LAN</strong>. Type the name as <strong>Name for the stack</strong> and a real <strong>Admin email</strong>.</p>
+<p><img src="../guides/images/install-lan-01-where.png" alt="LAN selected with the name and email filled"></p>
+<p><em>The LAN choice. The name is masked.</em></p>
+</li>
+<li><p>Choose a dataset on <strong>Start with.</strong> and press <strong>Continue</strong> (the screen is the same in every mode; the local tutorial describes the ten datasets).</p>
+<p><img src="../guides/images/install-lan-02a-dataset.png" alt="The dataset screen"></p>
+<p><em>The dataset list with its description panel.</em></p>
+<p>On <strong>Your licence.</strong> choose the key file and enter the secret and the slug.</p>
+<p><img src="../guides/images/install-lan-02-licence.png" alt="The licence screen"></p>
+<p><em>The licence screen; the machine&#39;s public address is masked.</em></p>
+</li>
+<li><p>On the review screen tick <strong>Relay access</strong> and the agreement, then press <strong>Prepare my Minimal</strong>.</p>
+<p><img src="../guides/images/install-lan-03-review.png" alt="The review screen"></p>
+<p><em>Both boxes ticked.</em></p>
+</li>
+<li><p>Wait for <strong>Ready.</strong> The page narrates the same eight stages as in the local tutorial.</p>
+<p><img src="../guides/images/install-lan-04-progress.png" alt="Stage four of eight"></p>
+<p><em>The installer working through the stages.</em></p>
+<p><img src="../guides/images/install-lan-05-ready.png" alt="The Ready screen in LAN mode"></p>
+<p><em>The Ready screen ends with <strong>One trust step, on each device</strong>, a <strong>Show the root certificate</strong> button and the AI assistants (MCP) address.</em></p>
+</li>
+<li><p>Check the containers on the server:</p>
+<pre><code class="language-bash">docker compose ps
+</code></pre>
+<p><img src="../guides/images/install-lan-06-containers.png" alt="docker compose ps"></p>
+<p><em>The stack running on the server.</em></p>
+</li>
+</ol>
+<h2>Trust the certificate on each device</h2>
+<p>A device that has not trusted the stack&#39;s root certificate refuses the connection. From a device, without the root:</p>
+<pre><code class="language-bash">curl -sS https://api.xx-yy-zz-aa.nip.io/app/
+</code></pre>
+<pre><code class="language-text">curl: (60) SSL certificate problem: unable to get local issuer certificate
+</code></pre>
+<p>Get the root, check it, trust it.</p>
+<ol>
+<li><p>Fetch it on the server, which also prints its SHA-256 fingerprint:</p>
+<pre><code class="language-bash">docker compose run --rm -T ca-cert &gt; pitstop-root.crt
+</code></pre>
+<pre><code class="language-text">SHA-256 fingerprint (compare on the device): F0:D9:1A:2B:…
+</code></pre>
+<p>Or fetch it from the device itself at <code>http://auth.xx-yy-zz-aa.nip.io/pitstop-root.crt</code>. Both routes give the same certificate.</p>
+</li>
+<li><p>On the device, compare the fingerprint with the one printed on the server:</p>
+<pre><code class="language-bash">openssl x509 -in pitstop-root.crt -noout -fingerprint -sha256
+</code></pre>
+</li>
+<li><p>Trust it. On Debian or Ubuntu:</p>
+<pre><code class="language-bash">sudo cp pitstop-root.crt /usr/local/share/ca-certificates/ &amp;&amp; sudo update-ca-certificates
+</code></pre>
+<p>On macOS, open Keychain Access, import into <strong>System</strong>, and set <strong>Always Trust</strong>. Windows, Firefox, iOS and Android have their own certificate stores; each takes the same file.</p>
+</li>
+<li><p>Check:</p>
+<pre><code class="language-bash">curl -sS --cacert pitstop-root.crt -o /dev/null -w &#39;%{http_code}\n&#39; https://api.xx-yy-zz-aa.nip.io/app/
+</code></pre>
+<pre><code class="language-text">200
+</code></pre>
+</li>
+</ol>
+<p>Trusting the root makes the device accept anything this server signs. Do it only on devices you own, and remove it when you are done.</p>
+<h2>Sign in</h2>
+<p>Sign in exactly as in the local tutorial, with the console at <code>https://auth.xx-yy-zz-aa.nip.io/ui/console</code> and the login name <code>admin@pitstop.auth.xx-yy-zz-aa.nip.io</code>.</p>
+<p><img src="../guides/images/install-lan-08-app.png" alt="The sample app over HTTPS in LAN mode"></p>
+<p><em>The sample app signed in, served over the stack&#39;s own HTTPS.</em></p>
+<p><img src="../guides/images/install-lan-07-sign-in.png" alt="The login-name page"></p>
+<p><em>The login-name page on the LAN name.</em></p>
+<h2>Verify</h2>
+<ul>
+<li><code>docker compose ps</code> shows <code>caddy</code>, <code>minimal</code>, <code>resolver</code> and <code>relay</code> as <code>running (healthy)</code>.</li>
+<li>The <code>curl</code> without the root fails with <code>(60)</code>; with <code>--cacert</code> it prints <code>200</code>.</li>
+<li>The fingerprint printed by <code>ca-cert</code> equals the one <code>openssl</code> prints on the device.</li>
+</ul>
+<h2>Roll back</h2>
+<p><code>docker compose down -v</code> stops the stack and erases its data. The mode, name and email are fixed at the first start, so changing them means this reset.</p>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

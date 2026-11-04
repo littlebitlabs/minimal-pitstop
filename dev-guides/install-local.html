@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial: install Minimal on your own computer</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>Tutorial: install Minimal on your own computer</h1>
+<p>You will install the whole Minimal stack on one machine with Docker, using a browser installer, and finish by signing in to a sample CRM that runs on it. Allow about fifteen minutes; the first start downloads the images.</p>
+<p>The screenshots show a Mac. The screens are the same on Linux.</p>
+<h2>What you need</h2>
+<ul>
+<li>Docker Engine 26 or later with the Compose plugin (<code>docker compose version</code>), and ports 80 and 443 free on this machine.</li>
+<li>Your licence key file and its secret, and your slug, from <a href="https://license.littlebitlabs.com">https://license.littlebitlabs.com</a> (self-service — sign in with Google or GitHub).</li>
+<li>This machine&#39;s public address added under <strong>Relay access</strong> in the licence portal, in the organisation that owns the key file. Without it the licence server refuses the install.</li>
+<li>You accept the <a href="https://littlebitlabs.com/company/terms">Terms of Service</a>, <a href="https://littlebitlabs.com/company/privacy">Privacy Policy</a> and <a href="https://littlebitlabs.com/company/consent-notice">Consent Notice</a>. The installer asks you to tick a box that says so.</li>
+</ul>
+<p>Placeholders in this guide: <code>&lt;your-key-file&gt;.json</code> is the key file you downloaded and <code>&lt;your-secret&gt;</code> is its secret. Neither is ever typed into a command line here.</p>
+<h2>Get your licence (once)</h2>
+<p>The licence is self-service. Sign in at <a href="https://license.littlebitlabs.com">https://license.littlebitlabs.com</a> with <strong>Continue with Google</strong> or <strong>Continue with GitHub</strong> — the portal has no passwords and reads only your name and email.</p>
+<p><img src="../guides/images/licence-portal-00-signin.png" alt="The portal's sign-in page"></p>
+<p><em>The sign-in page: the <strong>Customer</strong> tab, then Google or GitHub.</em></p>
+<p>Once signed in, three pages matter. The screenshots mask the signed-in person and every address.</p>
+<ol>
+<li><p><strong>Account</strong> shows your <strong>Slug</strong>, marked <strong>Permanent</strong>. You type it into the installer.</p>
+<p><img src="../guides/images/licence-portal-03-account.png" alt="The Account page"></p>
+<p><em>The Account page. The organisation&#39;s slug is permanent; to change anything else, contact support and mention it.</em></p>
+</li>
+<li><p><strong>License</strong> shows the licence&#39;s product, dates and status. Press <strong>Download license file</strong> to get <code>minimal-license-&lt;slug&gt;.json</code>. The <strong>License secret</strong> is shown once, when you download the file, and never again; <strong>Replace secret</strong> issues a new one if you lose it. The file stays valid.</p>
+<p><img src="../guides/images/licence-portal-01-licence.png" alt="The License page"></p>
+<p><em>The License page with the <strong>Download license file</strong> and <strong>Replace secret</strong> buttons.</em></p>
+</li>
+<li><p><strong>Relay access</strong> lists the addresses your installation may connect from. Any other address is refused. Add this machine&#39;s public address here before you install. <strong>Add this address</strong> fills in the public address of the browser you are using; that is the machine&#39;s address only when the browser and the stack leave through the same address. Otherwise type the address, or a range, under <strong>Address or range</strong>, give it a <strong>Label</strong> and press <strong>Add address</strong>. A refused attempt appears under <strong>Refused addresses</strong> with an <strong>Add</strong> button.</p>
+<p><img src="../guides/images/licence-portal-02-relay-access.png" alt="The Relay access page"></p>
+<p><em>The Relay access page. You can list up to 50 addresses.</em></p>
+</li>
+</ol>
+<p>Keep the key file and its secret apart: the file opens only with the secret.</p>
+<h2>1. Fetch the compose file and start the installer</h2>
+<p>Make a folder under your home directory and run every <code>docker compose</code> command from it.</p>
+<pre><code class="language-bash">mkdir pitstop &amp;&amp; cd pitstop &amp;&amp; mkdir licence
+</code></pre>
+<pre><code class="language-bash">curl -fsSL --proto &#39;=https&#39; --proto-redir &#39;=https&#39; -o docker-compose.yml \
+  https://artifacts.littlebitlabs.com/api/packages/littlebitlabs/generic/compose/0.3.6/docker-compose-v0.3.6.yml
+</code></pre>
+<pre><code class="language-bash">docker compose up wizard
+</code></pre>
+<p>The installer prints a one-time address that looks like <code>http://localhost:8070/?token=…</code>. Open it in a browser on this machine. The address is valid for this run of the installer only.</p>
+<pre class="mermaid">flowchart LR
+  A[compose file] --> B[docker compose up wizard]
+  B --> C[installer page in your browser]
+  C --> D[licence + choices]
+  D --> E[stack starts: databases, identity, Core, gateway]
+  E --> F[Ready screen]
+</pre>
+<p><em>From the compose file to the Ready screen.</em></p>
+<h2>2. Choose where it runs</h2>
+<ol>
+<li><p>The first page is <strong>Hello.</strong> It lists what you get after the install: sign-in and a console to manage users and roles, a REST API over every table, permissions enforced on every call, optional Google or GitHub sign-in (Hosted and LAN), and a sample workspace app with API collections for Postman, Bruno, Insomnia and OpenAPI. <strong>Before you start</strong> lists the three things every mode needs: Docker running on this machine, your licence, and this machine&#39;s public address added under Relay access. Press <strong>Continue</strong>; the next step checks Docker first.</p>
+<p><img src="../guides/images/install-local-01-welcome.png" alt="The first page of the installer"></p>
+<p><em>The installer&#39;s first page, <strong>Hello.</strong></em></p>
+</li>
+<li><p>Under <strong>Where will this run?</strong> choose <strong>Local</strong>, then <strong>Continue</strong>. Local means this computer only; the stack answers at addresses like <code>http://api.localhost</code>.</p>
+<p><img src="../guides/images/install-local-02-where.png" alt="Local is selected"></p>
+<p><em>Local selected on the Where screen.</em></p>
+</li>
+<li><p><strong>Start with.</strong> lists ten datasets. Pick one to look at while you learn Minimal; it is loaded into your own database at the first start. Beside the list the page describes the one you have selected: its area, its tables, and <strong>Who sees what</strong>.</p>
+<p><img src="../guides/images/install-local-03-dataset.png" alt="The dataset list with Acme selected"></p>
+<p><em>The ten datasets (the number beside each is its table count): Acme, CRM, Helpdesk, Events, Inventory, Expenses, Observability, Education, Clinic and Starter. Acme is selected first.</em></p>
+<p>Select <strong>CRM</strong>. The panel says <strong>Customers &amp; pipeline · 8 tables</strong>, lists the tables, and explains the access classes: each table has its own, a viewer is refused 1 of the 8, and editors and admins read them all and can add and change rows in 6. Then press <strong>Continue</strong>.</p>
+<p><img src="../guides/images/install-local-03b-dataset-crm.png" alt="CRM selected"></p>
+<p><em>The CRM dataset: twenty accounts, six stages, and deals spread over four reps.</em></p>
+<p>The dataset is fixed at the first start, like the mode, the name and the ports. Changing it later means <code>docker compose down -v</code>, which erases data.</p>
+</li>
+</ol>
+<h2>3. Give it your licence</h2>
+<ol start="4">
+<li><p>On <strong>Your licence.</strong> choose your key file, paste the <strong>File secret</strong>, and type your <strong>Slug</strong>. The page shows this machine&#39;s public address (masked in the screenshot) so you can add it under <strong>Relay access</strong>.</p>
+<p><img src="../guides/images/install-local-04-licence.png" alt="The licence screen, filled"></p>
+<p><em>The licence screen with a key file chosen. The secret shows as dots.</em></p>
+</li>
+<li><p>Press <strong>Continue</strong>. On the review screen tick the <strong>Relay access</strong> box and the box that begins <strong>I agree to the Terms of Service</strong>. <strong>Prepare my Minimal</strong> stays off until both are ticked.</p>
+<p><img src="../guides/images/install-local-05-review.png" alt="The review screen with both boxes ticked"></p>
+<p><em>Both boxes ticked; the button is on.</em></p>
+</li>
+<li><p>Press <strong>Prepare my Minimal</strong>. The page narrates eight stages: <strong>Fetching the images</strong>, <strong>Securing your keys</strong>, <strong>Preparing your databases</strong>, <strong>Starting identity</strong>, <strong>Checking your licence</strong>, <strong>Loading the</strong> sample, <strong>Starting the front door</strong> and <strong>Checking the front door is reachable</strong>.</p>
+<p><img src="../guides/images/install-local-06-progress.png" alt="Stage four of eight"></p>
+<p><em>Stage four of eight: the page counts the stages and marks the current one.</em></p>
+</li>
+<li><p>When the last stage passes, the page says <strong>Ready.</strong></p>
+<p><img src="../guides/images/install-local-07-ready.png" alt="The Ready screen"></p>
+<p><em>The Ready screen lists every address, your admin account, API collections and the MCP address.</em></p>
+</li>
+</ol>
+<h2>4. Check the containers</h2>
+<p>In your folder:</p>
+<pre><code class="language-bash">docker compose ps
+</code></pre>
+<p><img src="../guides/images/install-local-08-containers.png" alt="docker compose ps"></p>
+<p><em>Twelve services running. The installer container stays until you press <strong>Finish — close the installer</strong> on the Ready screen.</em></p>
+<p>Services with a health check show <code>(healthy)</code>. <code>app</code> and <code>zitadel</code> have none by design.</p>
+<h2>5. Sign in</h2>
+<p>The first user is the admin: <code>admin@pitstop.auth.localhost</code>. Its initial password is shown once by <strong>Reveal the initial password</strong> on the Ready screen. To read it later, from your folder:</p>
+<pre><code class="language-bash">docker compose run --rm -T admin-password
+</code></pre>
+<ol start="8">
+<li><p>Open the console address from the Ready screen, <code>http://auth.localhost/ui/console</code>, and type the login name.</p>
+<p><img src="../guides/images/install-local-09-sign-in.png" alt="The sign-in page"></p>
+<p><em>The login-name page.</em></p>
+</li>
+<li><p>Type the initial password.</p>
+<p><img src="../guides/images/install-local-10-password.png" alt="The password page"></p>
+<p><em>The password page; the password is masked in the screenshot.</em></p>
+</li>
+<li><p>The first sign-in forces a new password: at least 8 characters with a symbol, a number, an uppercase and a lowercase letter. The page ticks each rule as you meet it.</p>
+<p><img src="../guides/images/install-local-11-new-password.png" alt="Change password"></p>
+<p><em>The change-password page with no rule met yet.</em></p>
+</li>
+<li><p>After the change the identity console opens.</p>
+<p><img src="../guides/images/install-local-12-console.png" alt="The console"></p>
+<p><em>The identity console, where you manage users and roles.</em></p>
+</li>
+<li><p>Open the sample app at <code>http://api.localhost/app/</code> and press <strong>Sign in</strong>. You land on the pipeline of the CRM dataset.</p>
+<p><img src="../guides/images/install-local-13-app.png" alt="The CRM app"></p>
+<p><em>The sample app, signed in as the admin: forty deals in six stages.</em></p>
+</li>
+</ol>
+<h2>Check yourself</h2>
+<ul>
+<li><code>docker compose ps</code> lists <code>caddy</code>, <code>minimal</code>, <code>resolver</code> and <code>relay</code> as <code>running (healthy)</code>.</li>
+<li><code>http://api.localhost/app/</code> shows <strong>Pipeline.</strong> with 40 deals after you sign in.</li>
+<li>Signing in again with the initial password is refused; the new one works.</li>
+<li>The installer is still running until you press <strong>Finish — close the installer</strong>.</li>
+</ul>
+<h2>Next</h2>
+<ul>
+<li>Put the stack on your network: <a href="install-lan.html">Run Minimal on a LAN host</a>.</li>
+<li>Put it on the internet: <a href="install-hosted.html">Put Minimal on the internet</a>.</li>
+<li>Use it from an AI assistant: <a href="mcp-developer-guide.html">Minimal over MCP</a>.</li>
+</ul>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>

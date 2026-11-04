@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference: the stack</title>
+<style>
+:root { color-scheme: light dark; }
+body { font-family: system-ui, -apple-system, sans-serif; max-width: 48rem; margin: 0 auto;
+  padding: 2rem 1rem 4rem; line-height: 1.6; color: #1c1c1e; background: #ffffff; }
+h1, h2, h3 { line-height: 1.25; } h1 { font-size: 1.7rem; } h2 { margin-top: 2.2rem; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: #f1f1f3; border-radius: 4px; padding: .1em .35em; }
+pre { background: #f6f6f8; border: 1px solid #e3e3e7; border-radius: 8px; padding: .9rem 1rem;
+  white-space: pre-wrap; overflow-wrap: anywhere; } pre code { background: none; padding: 0; white-space: inherit; }
+table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+th, td { border: 1px solid #d9d9de; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+th { background: #f1f1f3; }
+img { max-width: 100%; height: auto; }
+em { color: #555; } a { color: #0b57d0; }
+.crumb { font-size: .85rem; margin-bottom: 2rem; } .crumb a { text-decoration: none; color: #666; }
+pre.mermaid { background: #ffffff; text-align: center; }
+@media (prefers-color-scheme: dark) {
+  body { color: #e6e6e8; background: #121214; }
+  code { background: #232327; } pre { background: #1b1b1f; border-color: #2e2e33; }
+  th { background: #232327; } th, td { border-color: #333338; }
+  em { color: #a0a0a5; } a { color: #8ab4f8; } .crumb a { color: #909095; }
+  pre.mermaid { background: #1b1b1f; }
+}</style>
+</head>
+<body>
+<p class="crumb"><a href="README.html">&larr; Minimal Pitstop guides</a></p>
+<h1>Reference: the stack</h1>
+<p>One compose file runs everything. After an install, <code>docker compose ps</code> in your install folder lists eleven long-running services; the installer (<code>wizard</code>) is a twelfth until you press <strong>Finish — close the installer</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Service</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>caddy</code></td>
+<td>the front door: the only service with published ports (80 and 443), and the holder of the certificates</td>
+</tr>
+<tr>
+<td><code>apisix</code></td>
+<td>the API gateway behind the front door</td>
+</tr>
+<tr>
+<td><code>minimal</code></td>
+<td>Minimal Core: the REST API, Custom APIs, permissions and the MCP door</td>
+</tr>
+<tr>
+<td><code>zitadel</code>, <code>zitadel-login</code></td>
+<td>the identity service: sign-in pages and the management console</td>
+</tr>
+<tr>
+<td><code>app</code></td>
+<td>the sample workspace app, served at <code>/app/</code></td>
+</tr>
+<tr>
+<td><code>relay</code></td>
+<td>the licence relay — the only service that talks to the licence server, at <code>relay.license.littlebitlabs.com:443</code></td>
+</tr>
+<tr>
+<td><code>resolver</code></td>
+<td>internal plumbing; healthy means fine</td>
+</tr>
+<tr>
+<td><code>pg-core</code></td>
+<td>Postgres for Core&#39;s own data: definitions, apps, sessions, the audit trail</td>
+</tr>
+<tr>
+<td><code>pg-app</code></td>
+<td>Postgres for the sample dataset you chose</td>
+</tr>
+<tr>
+<td><code>pg-zitadel</code></td>
+<td>Postgres for the identity service</td>
+</tr>
+</tbody></table>
+<p>Services with a health check report <code>(healthy)</code>; <code>app</code> and <code>zitadel</code> have none by design. Everything else reporting <code>running (healthy)</code> — <code>caddy</code>, <code>minimal</code>, <code>resolver</code> and <code>relay</code> in particular — is the quick health read; <a href="howto-operate.html">the tour</a> is the real one.</p>
+<pre class="mermaid">flowchart LR
+  B[your browser or client] -->|80 and 443| C[caddy]
+  C -->|auth.name| Z[zitadel]
+  C -->|api.name| G[apisix]
+  G --> M[minimal — Core]
+  M --> P1[(pg-core)]
+  Z --> P2[(pg-zitadel)]
+  M --- R[relay] -->|443| L[licence server]
+</pre>
+<p><em>The two names, the front door, the gateway, Core, and the one licence connection.</em></p>
+<h2>The helpers</h2>
+<p>The same compose file defines one-shot services you run on demand with <code>docker compose run --rm -T &lt;name&gt;</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Helper</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tour</code></td>
+<td>proves the install: an editor read, a viewer refusal, the MCP door</td>
+</tr>
+<tr>
+<td><code>admin-password</code></td>
+<td>prints the admin&#39;s initial password (shown nowhere else)</td>
+</tr>
+<tr>
+<td><code>backup</code>, <code>restore-state</code>, <code>restore-data</code></td>
+<td>a full backup to stdout, and the two-step restore</td>
+</tr>
+<tr>
+<td><code>ca-cert</code></td>
+<td>LAN mode: prints the stack&#39;s root certificate and its fingerprint</td>
+</tr>
+<tr>
+<td><code>qr</code></td>
+<td>LAN and Hosted: a QR code of the app&#39;s address for a phone</td>
+</tr>
+<tr>
+<td><code>mcp-token</code></td>
+<td>mints (or, with <code>--revoke</code>, revokes) an MCP token</td>
+</tr>
+<tr>
+<td><code>postman-env</code></td>
+<td>emits the API environment with the demo users&#39; credentials filled in; runs only on the stack&#39;s machine</td>
+</tr>
+</tbody></table>
+<h2>The addresses</h2>
+<p>Everything answers under two names — <code>auth.&lt;name&gt;</code> and <code>api.&lt;name&gt;</code> (<code>auth.localhost</code> and <code>api.localhost</code> in Local mode):</p>
+<table>
+<thead>
+<tr>
+<th>Address</th>
+<th>What answers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>auth.&lt;name&gt;/ui/console</code></td>
+<td>the identity console</td>
+</tr>
+<tr>
+<td><code>api.&lt;name&gt;/app/</code></td>
+<td>the sample app</td>
+</tr>
+<tr>
+<td><code>api.&lt;name&gt;/app/config/config.json</code></td>
+<td>the install&#39;s public identifiers (below)</td>
+</tr>
+<tr>
+<td><code>api.&lt;name&gt;/minimal/api/rest/auto/v1/…</code></td>
+<td>the REST API (<a href="reference-rest-api.html">reference</a>)</td>
+</tr>
+<tr>
+<td><code>api.&lt;name&gt;/minimal/mcp/rpc/v1</code></td>
+<td>the MCP door (POST; answers 401 without a token)</td>
+</tr>
+<tr>
+<td><code>api.&lt;name&gt;/minimal-token/…</code></td>
+<td>the Core access-token door used by Minimal Studio</td>
+</tr>
+</tbody></table>
+<p><code>config.json</code> needs no sign-in and is where your code learns the install&#39;s identifiers:</p>
+<pre><code class="language-json">{
+  &quot;client_id&quot;: &quot;397826712957681667&quot;,
+  &quot;issuer&quot;: &quot;http://auth.localhost&quot;,
+  &quot;api&quot;: &quot;http://api.localhost&quot;,
+  &quot;project_id&quot;: &quot;397826712638849027&quot;,
+  &quot;org&quot;: &quot;Acme Inc&quot;,
+  &quot;org_slug&quot;: &quot;acme&quot;,
+  &quot;project&quot;: &quot;CRM&quot;,
+  &quot;project_slug&quot;: &quot;crm&quot;,
+  &quot;studio_desktop_client_id&quot;: &quot;397826718259281923&quot;,
+  &quot;core&quot;: {
+    &quot;org_id&quot;: &quot;01JPITSTOPACMEORG000000000&quot;,
+    &quot;project_id&quot;: &quot;01JPITSTOPACMEPEOPLE000000&quot;,
+    &quot;space_id&quot;: &quot;01JPITSTOPACMEDEV000000000&quot;,
+    &quot;space&quot;: &quot;dev&quot;
+  }
+}
+</code></pre>
+<p>The ids differ per install; the shape does not. <code>org_slug</code> and <code>project_slug</code> build REST paths, <code>project_id</code> builds the token scope, <code>studio_desktop_client_id</code> connects Minimal Studio, and the <code>core</code> block names your organisation, project and space for Custom API documents.</p>
+<h2>Fixed at the first start</h2>
+<p>Slug, mode, name, admin email, ports, dataset, and the two <code>security:</code> switches (<code>require_mfa</code>, <code>database_ddl</code>) are read once, at the first start. Changing any of them means <code>docker compose down -v</code>, which erases all data. Everything else — the licence file, the secret — can change on a running install (<a href="howto-operate.html">how</a>).</p>
+<h2>What a machine needs</h2>
+<ul>
+<li>Docker Engine 26 or later with the Compose plugin; 2 vCPU and 4 GiB are enough; about 3 GB of images plus your data.</li>
+<li><code>linux/amd64</code> or <code>linux/arm64</code>, both native.</li>
+<li>Ports 80 <strong>and</strong> 443 (movable in Local and LAN mode — <a href="howto-ports-and-a-second-install.html">how</a>).</li>
+<li>Outbound HTTPS to <code>artifacts.littlebitlabs.com</code>, <code>relay.license.littlebitlabs.com</code>, <code>docker.io</code>, <code>ghcr.io</code>, and Let&#39;s Encrypt in Hosted mode.</li>
+<li>Not supported: a load balancer, CDN or proxy in front; IPv6-only hosts; renaming after the first start; outbound mail.</li>
+</ul>
+
+<script type="module">
+try {
+  const m = await import('https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs');
+  m.default.initialize({ startOnLoad: false, theme: 'neutral' });
+  await m.default.run({ querySelector: 'pre.mermaid' });
+} catch { /* offline: the diagram source stays readable */ }
+</script>
+</body>
+</html>
